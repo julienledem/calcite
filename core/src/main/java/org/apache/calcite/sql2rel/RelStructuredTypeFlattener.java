@@ -307,6 +307,7 @@ public class RelStructuredTypeFlattener implements ReflectiveVisitor {
     final RelNode newRel = getNewForOldRel(oldRel);
     return Mappings.target(
         new Function<Integer, Integer>() {
+          @Override
           public Integer apply(Integer oldInput) {
             return getNewForOldInput(oldInput);
           }
@@ -701,6 +702,7 @@ public class RelStructuredTypeFlattener implements ReflectiveVisitor {
             RelNode.class);
 
     // implement RelVisitor
+    @Override
     public void visit(RelNode p, int ordinal, RelNode parent) {
       // rewrite children first
       super.visit(p, ordinal, parent);
@@ -718,12 +720,11 @@ public class RelStructuredTypeFlattener implements ReflectiveVisitor {
           // for leaves, it's usually safe to assume that
           // no transformation is required
           rewriteGeneric(p);
+        } else {
+          throw Util.newInternal(
+              "no '" + visitMethodName + "' method found for class "
+              + p.getClass().getName());
         }
-      }
-      if (!found) {
-        throw Util.newInternal(
-            "no '" + visitMethodName + "' method found for class "
-            + p.getClass().getName());
       }
     }
   }
