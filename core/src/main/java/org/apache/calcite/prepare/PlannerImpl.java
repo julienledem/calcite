@@ -22,6 +22,7 @@ import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelOptSchema;
 import org.apache.calcite.plan.RelOptTable.ViewExpander;
+import org.apache.calcite.prepare.Prepare.CatalogReader;
 import org.apache.calcite.plan.RelTraitDef;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
@@ -31,8 +32,10 @@ import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlOperatorTable;
 import org.apache.calcite.sql.TypedSqlNode;
+import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParser;
+import org.apache.calcite.sql.util.ChainedSqlOperatorTable;
 import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.sql2rel.RelDecorrelator;
 import org.apache.calcite.sql2rel.SqlRexConvertletTable;
@@ -47,6 +50,7 @@ import org.apache.calcite.util.Util;
 
 import com.google.common.collect.ImmutableList;
 
+import java.util.Arrays;
 import java.util.List;
 
 /** Implementation of {@link org.apache.calcite.tools.Planner}. */
@@ -106,16 +110,19 @@ public class PlannerImpl implements Planner {
     state.from(this);
   }
 
+  @Override
   public RelTraitSet getEmptyTraitSet() {
     return planner.emptyTraitSet();
   }
 
+  @Override
   public void close() {
     open = false;
     typeFactory = null;
     state = State.STATE_0_CLOSED;
   }
 
+  @Override
   public void reset() {
     ensure(State.STATE_0_CLOSED);
     open = true;
@@ -130,8 +137,10 @@ public class PlannerImpl implements Planner {
     ensure(State.STATE_1_RESET);
     Frameworks.withPlanner(
         new Frameworks.PlannerAction<Void>() {
+          @Override
           public Void apply(RelOptCluster cluster, RelOptSchema relOptSchema,
               SchemaPlus rootSchema) {
+            // TODO: the following line does nothing
             Util.discard(rootSchema); // use our own defaultSchema
             typeFactory = (JavaTypeFactory) cluster.getTypeFactory();
             planner = cluster.getPlanner();
@@ -154,6 +163,7 @@ public class PlannerImpl implements Planner {
     }
   }
 
+  @Override
   public SqlNode parse(final String sql) throws SqlParseException {
     switch (state) {
     case STATE_0_CLOSED:
@@ -167,11 +177,19 @@ public class PlannerImpl implements Planner {
     return sqlNode;
   }
 
+  @Override
   public SqlNode validate(SqlNode sqlNode) throws ValidationException {
     ensure(State.STATE_3_PARSED);
+    final CatalogReader catalogReader = createCatalogReader();
+    final SqlOperatorTable opTab =
+        new ChainedSqlOperatorTable(
+            Arrays.<SqlOperatorTable>asList(
+                operatorTable,
+                catalogReader
+            ));
     this.validator =
         new CalciteSqlValidator(
-            operatorTable, createCatalogReader(), typeFactory);
+            opTab, createCatalogReader(), typeFactory);
     this.validator.setIdentifierExpansion(true);
     try {
       validatedSqlNode = validator.validate(sqlNode);
@@ -191,6 +209,7 @@ public class PlannerImpl implements Planner {
     return new TypedSqlNode(validatedNode, type);
   }
 
+  @Override
   public RelNode convert(SqlNode sql) throws RelConversionException {
     ensure(State.STATE_4_VALIDATED);
     assert validatedSqlNode != null;
@@ -291,10 +310,12 @@ public class PlannerImpl implements Planner {
     return new RexBuilder(typeFactory);
   }
 
+  @Override
   public JavaTypeFactory getTypeFactory() {
     return typeFactory;
   }
 
+  @Override
   public RelNode transform(int ruleSetIndex, RelTraitSet requiredOutputTraits,
       RelNode rel) throws RelConversionException {
     RelTraitSet designedTraitSet = requiredOutputTraits.simplify();

@@ -41,6 +41,7 @@ import org.apache.calcite.sql.SqlExplain;
 import org.apache.calcite.sql.SqlExplainLevel;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.SqlOperatorTable;
 import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.sql.validate.SqlValidatorCatalogReader;
 import org.apache.calcite.sql.validate.SqlValidatorTable;
@@ -396,13 +397,15 @@ public abstract class Prepare {
 
   /** Interface by which validator and planner can read table metadata. */
   public interface CatalogReader
-      extends RelOptSchema, SqlValidatorCatalogReader {
+      extends RelOptSchema, SqlValidatorCatalogReader, SqlOperatorTable {
+    @Override
     PreparingTable getTableForMember(List<String> names);
 
     /** Returns a catalog reader the same as this one but with a possibly
      * different schema path. */
     CatalogReader withSchemaPath(List<String> schemaPath);
 
+    @Override
     PreparingTable getTable(List<String> names);
   }
 
@@ -436,6 +439,7 @@ public abstract class Prepare {
       this.detailLevel = detailLevel;
     }
 
+    @Override
     public String getCode() {
       if (rel == null) {
         return RelOptUtil.dumpType(rowType);
@@ -444,18 +448,22 @@ public abstract class Prepare {
       }
     }
 
+    @Override
     public RelDataType getParameterRowType() {
       return parameterRowType;
     }
 
+    @Override
     public boolean isDml() {
       return false;
     }
 
+    @Override
     public LogicalTableModify.Operation getTableModOp() {
       return null;
     }
 
+    @Override
     public List<List<String>> getFieldOrigins() {
       return Collections.singletonList(
           Collections.<String>nCopies(4, null));
@@ -465,6 +473,7 @@ public abstract class Prepare {
       return rel;
     }
 
+    @Override
     public abstract Bindable getBindable();
   }
 
@@ -536,18 +545,22 @@ public abstract class Prepare {
       this.isDml = isDml;
     }
 
+    @Override
     public boolean isDml() {
       return isDml;
     }
 
+    @Override
     public LogicalTableModify.Operation getTableModOp() {
       return tableModOp;
     }
 
+    @Override
     public List<List<String>> getFieldOrigins() {
       return fieldOrigins;
     }
 
+    @Override
     public RelDataType getParameterRowType() {
       return parameterRowType;
     }
@@ -561,12 +574,14 @@ public abstract class Prepare {
       return rowType;
     }
 
+    @Override
     public abstract Type getElementType();
 
     public RelNode getRootRel() {
       return rootRel;
     }
 
+    @Override
     public abstract Bindable getBindable();
   }
 

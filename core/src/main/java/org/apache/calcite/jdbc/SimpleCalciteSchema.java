@@ -131,12 +131,12 @@ public class SimpleCalciteSchema extends CalciteAbstractSchema {
 
   @Override
   public Collection<Function> getFunctions(String name, boolean caseSensitive) {
-    return Collections.EMPTY_LIST;
+    return schema.getFunctions(name);
   }
 
   @Override
   public NavigableSet<String> getFunctionNames() {
-    return Compatible.INSTANCE.navigableSet(ImmutableSortedSet.<String>of());
+    return Compatible.INSTANCE.navigableSet(ImmutableSortedSet.copyOf(schema.getFunctionNames()));
   }
 
   @Override
