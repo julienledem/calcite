@@ -36,6 +36,7 @@ import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.SqlOperatorTable;
 import org.apache.calcite.sql.SqlSyntax;
+import org.apache.calcite.sql.type.FamilyOperandTypeChecker;
 import org.apache.calcite.sql.type.InferTypes;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
@@ -51,6 +52,7 @@ import org.apache.calcite.sql.validate.SqlUserDefinedTableMacro;
 import org.apache.calcite.sql.validate.SqlValidatorUtil;
 import org.apache.calcite.util.Util;
 
+import com.google.common.base.Predicate;
 import com.google.common.collect.Collections2;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
@@ -244,7 +246,7 @@ public class CalciteCatalogReader implements Prepare.CatalogReader,
             }));
   }
 
-  private SqlOperator toOp(SqlIdentifier name, Function function) {
+  private SqlOperator toOp(SqlIdentifier name, final Function function) {
     List<RelDataType> argTypes = new ArrayList<RelDataType>();
     List<SqlTypeFamily> typeFamilies = new ArrayList<SqlTypeFamily>();
     for (FunctionParameter o : function.getParameters()) {
@@ -253,27 +255,33 @@ public class CalciteCatalogReader implements Prepare.CatalogReader,
       typeFamilies.add(
           Util.first(type.getSqlTypeName().getFamily(), SqlTypeFamily.ANY));
     }
-    final RelDataType returnType;
+    final Predicate<Integer> optional =
+        new Predicate<Integer>() {
+          public boolean apply(Integer input) {
+            return function.getParameters().get(input).isOptional();
+          }
+        };
+    final FamilyOperandTypeChecker typeChecker =
+        OperandTypes.family(typeFamilies, optional);
+    final List<RelDataType> paramTypes = toSql(argTypes);
     if (function instanceof ScalarFunction) {
       return new SqlUserDefinedFunction(name,
           ReturnTypes.explicit(Schemas.proto((ScalarFunction) function)),
-          InferTypes.explicit(argTypes), OperandTypes.family(typeFamilies),
-          toSql(argTypes), function);
+          InferTypes.explicit(argTypes), typeChecker, paramTypes, function);
     } else if (function instanceof AggregateFunction) {
-      returnType = ((AggregateFunction) function).getReturnType(typeFactory);
+      final RelDataType returnType =
+          ((AggregateFunction) function).getReturnType(typeFactory);
       return new SqlUserDefinedAggFunction(name,
           ReturnTypes.explicit(returnType), InferTypes.explicit(argTypes),
-          OperandTypes.family(typeFamilies), (AggregateFunction) function);
+          typeChecker, (AggregateFunction) function);
     } else if (function instanceof TableMacro) {
-      return new SqlUserDefinedTableMacro(name,
-          ReturnTypes.CURSOR,
-          InferTypes.explicit(argTypes), OperandTypes.family(typeFamilies),
+      return new SqlUserDefinedTableMacro(name, ReturnTypes.CURSOR,
+          InferTypes.explicit(argTypes), typeChecker, paramTypes,
           (TableMacro) function);
     } else if (function instanceof TableFunction) {
-      return new SqlUserDefinedTableFunction(name,
-          ReturnTypes.CURSOR,
-          InferTypes.explicit(argTypes), OperandTypes.family(typeFamilies),
-          toSql(argTypes), (TableFunction) function);
+      return new SqlUserDefinedTableFunction(name, ReturnTypes.CURSOR,
+          InferTypes.explicit(argTypes), typeChecker, paramTypes,
+          (TableFunction) function);
     } else {
       throw new AssertionError("unknown function type " + function);
     }
