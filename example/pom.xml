@@ -20,13 +20,13 @@ limitations under the License.
   <parent>
     <groupId>org.apache.calcite</groupId>
     <artifactId>calcite</artifactId>
-    <version>1.4.0-drill-r8-named-params</version>
+    <version>1.4.0-drill-r8-named-params-only</version>
   </parent>
 
   <!-- The basics. -->
   <artifactId>calcite-example</artifactId>
   <packaging>pom</packaging>
-  <version>1.4.0-drill-r8-named-params</version>
+  <version>1.4.0-drill-r8-named-params-only</version>
   <name>Calcite Examples</name>
   <description>Calcite examples</description>
 
